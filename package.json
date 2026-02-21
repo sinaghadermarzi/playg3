@@ -1,0 +1,12 @@
+{
+  "name": "testcapp",
+  "version": "1.0.0",
+  "description": "Message board app that saves messages to a local file",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

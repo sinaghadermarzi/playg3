@@ -1,0 +1,29 @@
+name: Deploy to CapRover
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # This action expects /github/workspace/deploy.tar to exist (unless you use its image-based mode).
+      - name: Create deploy.tar (CapRover source bundle)
+        run: |
+          # Create a tarball of the repo contents, excluding git metadata.
+          tar --exclude-vcs -cf deploy.tar .
+
+          # Sanity check so failures are obvious in logs
+          ls -lh deploy.tar
+
+      - name: Deploy to CapRover
+        uses: caprover/deploy-from-github@v1.1.2
+        with:
+          server: ${{ secrets.CAPROVER_SERVER }}  # e.g. https://captain.yourdomain.com
+          app: ${{ secrets.CAPROVER_APP }}        # your CapRover app name
+          token: ${{ secrets.CAPROVER_TOKEN }}    # app token from CapRover

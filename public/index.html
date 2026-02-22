@@ -3,196 +3,627 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Message Board</title>
+    <title>ML Job Crawler</title>
     <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
       body {
-        font-family: system-ui, sans-serif;
-        max-width: 600px;
-        margin: 40px auto;
-        padding: 0 20px;
-        color: #333;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #0f1117;
+        color: #e2e8f0;
+        min-height: 100vh;
+        padding: 24px 16px 60px;
       }
-      h1 {
-        margin-bottom: 24px;
-      }
-      form {
+
+      .container { max-width: 900px; margin: 0 auto; }
+
+      header {
         display: flex;
-        flex-direction: column;
-        gap: 8px;
+        align-items: center;
+        gap: 12px;
         margin-bottom: 32px;
       }
-      textarea {
-        width: 100%;
-        height: 80px;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 14px;
-        resize: vertical;
+      header .logo {
+        font-size: 28px;
       }
-      .form-footer {
+      header h1 {
+        font-size: 22px;
+        font-weight: 700;
+        color: #f0f4ff;
+      }
+      header p {
+        font-size: 13px;
+        color: #64748b;
+        margin-top: 2px;
+      }
+
+      /* ── Mode toggle ── */
+      .mode-tabs {
+        display: flex;
+        gap: 0;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 24px;
+        width: fit-content;
+      }
+      .mode-tab {
+        padding: 8px 20px;
+        background: transparent;
+        border: none;
+        color: #64748b;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all .15s;
+      }
+      .mode-tab.active {
+        background: #1e40af;
+        color: #fff;
+        font-weight: 600;
+      }
+
+      /* ── Control panel ── */
+      .panel {
+        background: #161b27;
+        border: 1px solid #1e293b;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .panel h2 { font-size: 14px; font-weight: 600; color: #94a3b8; margin-bottom: 14px; text-transform: uppercase; letter-spacing: .05em; }
+
+      .advanced-fields { display: none; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+      .advanced-fields.visible { display: flex; }
+
+      label { font-size: 13px; color: #94a3b8; display: block; margin-bottom: 4px; }
+      input[type="text"], input[type="password"], select {
+        width: 100%;
+        padding: 9px 12px;
+        background: #0f1117;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        color: #e2e8f0;
+        font-size: 14px;
+        outline: none;
+        transition: border-color .15s;
+      }
+      input:focus, select:focus { border-color: #3b82f6; }
+
+      .btn-start {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 24px;
+        background: #1d4ed8;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .15s;
+      }
+      .btn-start:hover { background: #2563eb; }
+      .btn-start:disabled { background: #1e3a6e; color: #64748b; cursor: not-allowed; }
+      .btn-start .spinner {
+        width: 14px; height: 14px;
+        border: 2px solid #fff3;
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin .6s linear infinite;
+        display: none;
+      }
+      .btn-start.loading .spinner { display: block; }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ── Progress ── */
+      .progress-box {
+        background: #161b27;
+        border: 1px solid #1e293b;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+        display: none;
+      }
+      .progress-box.visible { display: block; }
+      .progress-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        margin-bottom: 10px;
       }
-      .char-count {
-        font-size: 13px;
-        color: #888;
+      .progress-header span { font-size: 13px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
+      .badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-weight: 600;
+        text-transform: uppercase;
       }
-      .char-count.over {
-        color: #e00;
-        font-weight: bold;
-      }
-      button {
-        padding: 8px 20px;
-        background: #333;
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        font-size: 14px;
-        cursor: pointer;
-      }
-      button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      .error {
-        color: #e00;
-        font-size: 13px;
-        margin-top: 4px;
-      }
-      #messages {
-        list-style: none;
+      .badge.running { background: #1d4ed855; color: #60a5fa; border: 1px solid #1d4ed8; }
+      .badge.done { background: #14532d55; color: #4ade80; border: 1px solid #166534; }
+      .badge.error { background: #7f1d1d55; color: #f87171; border: 1px solid #991b1b; }
+
+      .log-list {
+        height: 160px;
+        overflow-y: auto;
+        font-size: 12px;
+        font-family: monospace;
+        color: #64748b;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 3px;
       }
-      #messages li {
-        padding: 12px;
-        border: 1px solid #e0e0e0;
-        border-radius: 6px;
-        background: #fafafa;
+      .log-list .log-entry { line-height: 1.5; }
+      .log-list .log-entry .ts { color: #334155; margin-right: 6px; }
+      .log-list .log-entry .msg { color: #94a3b8; }
+      .log-list .log-entry.done-entry .msg { color: #4ade80; font-weight: 600; }
+      .log-list .log-entry.error-entry .msg { color: #f87171; }
+
+      /* ── Summary ── */
+      .summary-box {
+        background: #0c1a30;
+        border: 1px solid #1e40af55;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 24px;
+        font-size: 13px;
+        color: #93c5fd;
+        line-height: 1.6;
+        display: none;
       }
-      #messages li .text {
-        white-space: pre-wrap;
-        word-break: break-word;
+      .summary-box.visible { display: block; }
+      .summary-box strong { color: #60a5fa; display: block; margin-bottom: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+
+      /* ── Jobs list ── */
+      .jobs-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
       }
-      #messages li .meta {
-        margin-top: 6px;
+      .jobs-header h2 { font-size: 16px; font-weight: 700; color: #f0f4ff; }
+      .jobs-count { font-size: 12px; color: #64748b; }
+
+      /* filters */
+      .filters {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .filter-btn {
+        padding: 5px 14px;
+        border-radius: 20px;
+        border: 1px solid #334155;
+        background: transparent;
+        color: #64748b;
         font-size: 12px;
-        color: #999;
+        cursor: pointer;
+        transition: all .15s;
       }
-      #messages li .source {
-        display: inline-block;
-        font-size: 11px;
-        padding: 1px 6px;
-        border-radius: 4px;
-        background: #0088cc;
+      .filter-btn.active {
+        background: #1e40af;
+        border-color: #1e40af;
         color: #fff;
-        margin-bottom: 4px;
       }
+
+      .jobs-list { display: flex; flex-direction: column; gap: 12px; }
+
+      .job-card {
+        background: #161b27;
+        border: 1px solid #1e293b;
+        border-radius: 10px;
+        padding: 16px;
+        transition: border-color .15s;
+        text-decoration: none;
+        display: block;
+        color: inherit;
+      }
+      .job-card:hover { border-color: #3b82f6; }
+
+      .job-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .job-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #e2e8f0;
+        line-height: 1.3;
+      }
+      .job-source {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .source-remoteok { background: #064e3b55; color: #34d399; border: 1px solid #065f4655; }
+      .source-wwr { background: #1e3a5f55; color: #60a5fa; border: 1px solid #1e40af55; }
+      .source-hn { background: #431407aa; color: #fb923c; border: 1px solid #7c2d1255; }
+      .source-other { background: #312e8155; color: #a78bfa; border: 1px solid #4c1d9555; }
+
+      .job-meta {
+        font-size: 12px;
+        color: #64748b;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .job-meta span { display: flex; align-items: center; gap: 4px; }
+
+      .job-desc {
+        font-size: 13px;
+        color: #475569;
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .job-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 8px;
+      }
+      .job-tag {
+        font-size: 11px;
+        padding: 2px 8px;
+        background: #1e293b;
+        border-radius: 4px;
+        color: #64748b;
+      }
+
+      .score-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+        font-size: 11px;
+        color: #64748b;
+      }
+      .score-dots {
+        display: flex;
+        gap: 2px;
+      }
+      .score-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: #334155;
+      }
+      .score-dot.filled { background: #3b82f6; }
+
+      .subfield-pill {
+        font-size: 11px;
+        padding: 1px 8px;
+        border-radius: 20px;
+        background: #312e81;
+        color: #a78bfa;
+        margin-left: 4px;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #334155;
+      }
+      .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+      .empty-state p { font-size: 14px; }
     </style>
   </head>
   <body>
-    <h1>Message Board</h1>
+    <div class="container">
+      <header>
+        <div class="logo">🤖</div>
+        <div>
+          <h1>ML Job Crawler</h1>
+          <p>Crawls the web for machine learning, AI &amp; data science jobs in real time</p>
+        </div>
+      </header>
 
-    <form id="msg-form">
-      <textarea
-        id="msg-input"
-        maxlength="280"
-        placeholder="Write a message (max 280 characters)..."
-      ></textarea>
-      <div class="form-footer">
-        <span class="char-count" id="char-count">0 / 280</span>
-        <button type="submit" id="submit-btn">Post</button>
+      <!-- Mode tabs -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="basic">Basic Mode</button>
+        <button class="mode-tab" data-mode="advanced">Advanced Mode (LangGraph)</button>
       </div>
-      <div class="error" id="error"></div>
-    </form>
 
-    <ul id="messages"></ul>
+      <!-- Control panel -->
+      <div class="panel">
+        <h2>Crawler Settings</h2>
+
+        <div class="advanced-fields" id="advanced-fields">
+          <div>
+            <label for="api-key">OpenAI API Key</label>
+            <input type="password" id="api-key" placeholder="sk-..." autocomplete="off" />
+          </div>
+          <div>
+            <label for="model-select">Model</label>
+            <select id="model-select">
+              <option value="gpt-4o-mini">gpt-4o-mini (fast &amp; cheap)</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-4-turbo">gpt-4-turbo</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn-start" id="start-btn">
+          <div class="spinner"></div>
+          <span>Start Crawl</span>
+        </button>
+      </div>
+
+      <!-- Progress box -->
+      <div class="progress-box" id="progress-box">
+        <div class="progress-header">
+          <span>Crawl Progress</span>
+          <span class="badge running" id="status-badge">Running</span>
+        </div>
+        <div class="log-list" id="log-list"></div>
+      </div>
+
+      <!-- Summary box (advanced mode) -->
+      <div class="summary-box" id="summary-box">
+        <strong>AI Market Summary</strong>
+        <span id="summary-text"></span>
+      </div>
+
+      <!-- Jobs list -->
+      <div id="jobs-section" style="display:none">
+        <div class="jobs-header">
+          <h2>Jobs Found</h2>
+          <span class="jobs-count" id="jobs-count"></span>
+        </div>
+        <div class="filters" id="filters"></div>
+        <div class="jobs-list" id="jobs-list"></div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="empty-state">
+        <div class="icon">🔍</div>
+        <p>Click <strong>Start Crawl</strong> to begin finding ML jobs</p>
+      </div>
+    </div>
 
     <script>
-      const MAX = 280;
-      const form = document.getElementById("msg-form");
-      const input = document.getElementById("msg-input");
-      const charCount = document.getElementById("char-count");
-      const errorEl = document.getElementById("error");
-      const messagesList = document.getElementById("messages");
-      const submitBtn = document.getElementById("submit-btn");
+      let currentMode = "basic";
+      let allJobs = [];
+      let activeFilter = "All";
 
-      input.addEventListener("input", () => {
-        const len = input.value.length;
-        charCount.textContent = `${len} / ${MAX}`;
-        charCount.classList.toggle("over", len > MAX);
+      // Mode tabs
+      document.querySelectorAll(".mode-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".mode-tab").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          currentMode = btn.dataset.mode;
+          document.getElementById("advanced-fields").classList.toggle("visible", currentMode === "advanced");
+        });
       });
 
-      async function loadMessages() {
-        const res = await fetch("/api/messages");
-        const messages = await res.json();
-        messagesList.innerHTML = "";
-        messages
-          .slice()
-          .reverse()
-          .forEach((m) => {
-            const li = document.createElement("li");
-            if (m.source === "telegram") {
-              const source = document.createElement("span");
-              source.className = "source";
-              source.textContent = `Telegram — ${m.sender}`;
-              li.appendChild(source);
-            }
-            const text = document.createElement("div");
-            text.className = "text";
-            text.textContent = m.message;
-            const meta = document.createElement("div");
-            meta.className = "meta";
-            meta.textContent = new Date(m.timestamp).toLocaleString();
-            li.appendChild(text);
-            li.appendChild(meta);
-            messagesList.appendChild(li);
-          });
-      }
+      // Start crawl
+      document.getElementById("start-btn").addEventListener("click", startCrawl);
 
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        errorEl.textContent = "";
-        const message = input.value.trim();
+      async function startCrawl() {
+        const btn = document.getElementById("start-btn");
+        const apiKey = document.getElementById("api-key").value.trim();
 
-        if (!message) {
-          errorEl.textContent = "Message cannot be empty.";
+        if (currentMode === "advanced" && !apiKey) {
+          alert("Please enter your OpenAI API key for advanced mode.");
           return;
         }
 
-        submitBtn.disabled = true;
+        btn.disabled = true;
+        btn.classList.add("loading");
+        btn.querySelector("span").textContent = "Crawling...";
+
+        // Reset UI
+        allJobs = [];
+        activeFilter = "All";
+        document.getElementById("log-list").innerHTML = "";
+        document.getElementById("jobs-list").innerHTML = "";
+        document.getElementById("filters").innerHTML = "";
+        document.getElementById("jobs-section").style.display = "none";
+        document.getElementById("empty-state").style.display = "none";
+        document.getElementById("summary-box").classList.remove("visible");
+        document.getElementById("summary-text").textContent = "";
+
+        const progressBox = document.getElementById("progress-box");
+        progressBox.classList.add("visible");
+        setStatusBadge("running");
+
+        const body = { mode: currentMode };
+        if (currentMode === "advanced") {
+          body.apiKey = apiKey;
+          body.model = document.getElementById("model-select").value;
+        }
+
+        let sessionId;
         try {
-          const res = await fetch("/api/messages", {
+          const res = await fetch("/api/crawl/start", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message }),
+            body: JSON.stringify(body),
           });
-          if (!res.ok) {
-            const data = await res.json();
-            errorEl.textContent = data.error || "Something went wrong.";
-            return;
-          }
-          input.value = "";
-          charCount.textContent = "0 / 280";
-          await loadMessages();
-        } catch {
-          errorEl.textContent = "Failed to send message.";
-        } finally {
-          submitBtn.disabled = false;
+          const data = await res.json();
+          if (!res.ok) { throw new Error(data.error || "Failed to start crawl"); }
+          sessionId = data.sessionId;
+        } catch (err) {
+          appendLog(err.message, "error");
+          setStatusBadge("error");
+          btn.disabled = false;
+          btn.classList.remove("loading");
+          btn.querySelector("span").textContent = "Start Crawl";
+          return;
         }
-      });
 
-      loadMessages();
-      setInterval(loadMessages, 5000);
+        // Stream progress via SSE
+        const sse = new EventSource(`/api/crawl/${sessionId}/progress`);
+        sse.onmessage = (e) => {
+          const data = JSON.parse(e.data);
+          if (data.type === "log") {
+            appendLog(data.msg);
+          } else if (data.type === "done") {
+            sse.close();
+            if (data.error) {
+              appendLog(`Error: ${data.error}`, "error");
+              setStatusBadge("error");
+            } else {
+              appendLog(`Done! Found ${data.jobCount} ML jobs.`, "done");
+              setStatusBadge("done");
+              if (data.summary) {
+                document.getElementById("summary-text").textContent = data.summary;
+                document.getElementById("summary-box").classList.add("visible");
+              }
+            }
+            btn.disabled = false;
+            btn.classList.remove("loading");
+            btn.querySelector("span").textContent = "Start New Crawl";
+            loadJobs(sessionId);
+          }
+        };
+        sse.onerror = () => {
+          sse.close();
+          setStatusBadge("error");
+          btn.disabled = false;
+          btn.classList.remove("loading");
+          btn.querySelector("span").textContent = "Start Crawl";
+        };
+      }
+
+      async function loadJobs(sessionId) {
+        const res = await fetch(`/api/crawl/${sessionId}/jobs`);
+        const data = await res.json();
+        allJobs = data.jobs || [];
+        renderJobs();
+      }
+
+      function renderJobs() {
+        const section = document.getElementById("jobs-section");
+        const emptyState = document.getElementById("empty-state");
+        const list = document.getElementById("jobs-list");
+        const countEl = document.getElementById("jobs-count");
+        const filtersEl = document.getElementById("filters");
+
+        if (!allJobs.length) {
+          emptyState.style.display = "block";
+          section.style.display = "none";
+          return;
+        }
+
+        emptyState.style.display = "none";
+        section.style.display = "block";
+
+        // Build filter options
+        const sources = ["All", ...new Set(allJobs.map((j) => j.source))];
+        filtersEl.innerHTML = "";
+        sources.forEach((s) => {
+          const btn = document.createElement("button");
+          btn.className = "filter-btn" + (s === activeFilter ? " active" : "");
+          btn.textContent = s;
+          btn.addEventListener("click", () => {
+            activeFilter = s;
+            document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            renderFilteredJobs();
+          });
+          filtersEl.appendChild(btn);
+        });
+
+        renderFilteredJobs();
+      }
+
+      function renderFilteredJobs() {
+        const list = document.getElementById("jobs-list");
+        const countEl = document.getElementById("jobs-count");
+        const filtered = activeFilter === "All" ? allJobs : allJobs.filter((j) => j.source === activeFilter);
+        countEl.textContent = `${filtered.length} job${filtered.length !== 1 ? "s" : ""}`;
+
+        list.innerHTML = "";
+        if (!filtered.length) {
+          list.innerHTML = `<div style="color:#334155;text-align:center;padding:30px">No jobs for this filter.</div>`;
+          return;
+        }
+
+        filtered.forEach((job) => {
+          const card = document.createElement("a");
+          card.className = "job-card";
+          card.href = job.url || "#";
+          card.target = "_blank";
+          card.rel = "noopener noreferrer";
+
+          const sourceClass = sourceToClass(job.source);
+          const dateStr = job.date ? new Date(job.date).toLocaleDateString() : "";
+
+          let scoreHtml = "";
+          if (job.relevanceScore) {
+            const dots = Array.from({ length: 10 }, (_, i) =>
+              `<span class="score-dot${i < job.relevanceScore ? " filled" : ""}"></span>`
+            ).join("");
+            scoreHtml = `<div class="score-bar"><span>Relevance</span><div class="score-dots">${dots}</div><span>${job.relevanceScore}/10</span>${job.mlSubfield ? `<span class="subfield-pill">${job.mlSubfield}</span>` : ""}${job.seniorityLevel && job.seniorityLevel !== "unknown" ? `<span class="subfield-pill" style="background:#1e3a5f;color:#60a5fa">${job.seniorityLevel}</span>` : ""}</div>`;
+          }
+
+          const tagsHtml = (job.tags || []).length
+            ? `<div class="job-tags">${job.tags.map((t) => `<span class="job-tag">${escHtml(t)}</span>`).join("")}</div>`
+            : "";
+
+          card.innerHTML = `
+            <div class="job-top">
+              <div class="job-title">${escHtml(job.title)}</div>
+              <span class="job-source ${sourceClass}">${escHtml(job.source)}</span>
+            </div>
+            <div class="job-meta">
+              <span>🏢 ${escHtml(job.company)}</span>
+              <span>📍 ${escHtml(job.location)}</span>
+              ${dateStr ? `<span>📅 ${dateStr}</span>` : ""}
+            </div>
+            ${job.description ? `<div class="job-desc">${escHtml(job.description)}</div>` : ""}
+            ${tagsHtml}
+            ${scoreHtml}
+          `;
+          list.appendChild(card);
+        });
+      }
+
+      function sourceToClass(source) {
+        if (!source) return "source-other";
+        const s = source.toLowerCase();
+        if (s.includes("remoteok")) return "source-remoteok";
+        if (s.includes("work remotely") || s.includes("wwr")) return "source-wwr";
+        if (s.includes("hacker") || s.includes("hn")) return "source-hn";
+        return "source-other";
+      }
+
+      function escHtml(str) {
+        if (!str) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function appendLog(msg, type) {
+        const list = document.getElementById("log-list");
+        const entry = document.createElement("div");
+        entry.className = "log-entry" + (type === "done" ? " done-entry" : type === "error" ? " error-entry" : "");
+        const now = new Date().toLocaleTimeString();
+        entry.innerHTML = `<span class="ts">[${now}]</span><span class="msg">${escHtml(msg)}</span>`;
+        list.appendChild(entry);
+        list.scrollTop = list.scrollHeight;
+      }
+
+      function setStatusBadge(state) {
+        const badge = document.getElementById("status-badge");
+        badge.className = "badge " + state;
+        badge.textContent = state === "running" ? "Running" : state === "done" ? "Done" : "Error";
+      }
     </script>
   </body>
 </html>
